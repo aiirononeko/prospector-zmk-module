@@ -1,5 +1,7 @@
 #include "layer_status.h"
 
+#include <string.h>
+
 #include <zmk/display.h>
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/event_manager.h>
@@ -21,16 +23,17 @@ static void layer_status_update(lv_obj_t *container, struct layer_status_state s
 
     if (state.index == 0) {
         lv_obj_fade_out(container, 200, 0);
-    } else {
-        const char *name =
-            zmk_keymap_layer_name(zmk_keymap_layer_index_to_id(state.index));
-        if (name && *name) {
-            lv_label_set_text(label, name);
-        } else {
-            lv_label_set_text_fmt(label, "LAYER %d", state.index);
-        }
-        lv_obj_fade_in(container, 200, 0);
+        return;
     }
+
+    const char *name =
+        zmk_keymap_layer_name(zmk_keymap_layer_index_to_id(state.index));
+    if (name && *name) {
+        lv_label_set_text(label, name);
+    } else {
+        lv_label_set_text_fmt(label, "LAYER %d", state.index);
+    }
+    lv_obj_fade_in(container, 200, 0);
 }
 
 static void layer_status_update_cb(struct layer_status_state state) {
@@ -40,10 +43,25 @@ static void layer_status_update_cb(struct layer_status_state state) {
     }
 }
 
+/* Pick the highest active layer whose name is NOT "WIN". Layers named "WIN"
+ * are OS toggles surfaced by the bottom os_mode indicator; they must not
+ * hijack the momentary-layer overlay. Returns 0 (default) when no other
+ * layer is active. */
+static uint8_t highest_non_win_layer(void) {
+    for (int i = ZMK_KEYMAP_LAYERS_LEN - 1; i >= 0; i--) {
+        zmk_keymap_layer_id_t id = zmk_keymap_layer_index_to_id(i);
+        if (id == ZMK_KEYMAP_LAYER_ID_INVAL) continue;
+        if (!zmk_keymap_layer_active(id)) continue;
+        const char *name = zmk_keymap_layer_name(id);
+        if (name && strcmp(name, "WIN") == 0) continue;
+        return (uint8_t)i;
+    }
+    return 0;
+}
+
 static struct layer_status_state layer_status_get_state(const zmk_event_t *eh) {
-    uint8_t index = zmk_keymap_highest_layer_active();
     return (struct layer_status_state){
-        .index = index,
+        .index = highest_non_win_layer(),
     };
 }
 

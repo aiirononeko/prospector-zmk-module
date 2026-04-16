@@ -30,20 +30,18 @@ static void set_battery_value(lv_obj_t *widget, struct battery_update_state stat
 
     lv_obj_t *col = lv_obj_get_child(widget, state.source);
     lv_obj_t *num = lv_obj_get_child(col, 0);
-    lv_obj_t *bar = lv_obj_get_child(col, 1);
+    lv_obj_t *arc = lv_obj_get_child(col, 1);
 
-    lv_bar_set_value(bar, state.level, LV_ANIM_ON);
+    lv_arc_set_value(arc, state.level);
     lv_label_set_text_fmt(num, "%d", state.level);
 
     if (state.level < 20) {
-        lv_obj_set_style_bg_color(bar, lv_color_hex(0xD3900F), LV_PART_INDICATOR);
-        lv_obj_set_style_bg_grad_color(bar, lv_color_hex(0xFFB802), LV_PART_INDICATOR);
-        lv_obj_set_style_bg_color(bar, lv_color_hex(0x3d2a00), LV_PART_MAIN);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0xFFB802), LV_PART_INDICATOR);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0x3d2a00), LV_PART_MAIN);
         lv_obj_set_style_text_color(num, lv_color_hex(0xFFB802), 0);
     } else {
-        lv_obj_set_style_bg_color(bar, lv_color_hex(0x606060), LV_PART_INDICATOR);
-        lv_obj_set_style_bg_grad_color(bar, lv_color_hex(0xf0f0f0), LV_PART_INDICATOR);
-        lv_obj_set_style_bg_color(bar, lv_color_hex(0x1a1a1a), LV_PART_MAIN);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0xf0f0f0), LV_PART_INDICATOR);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0x1a1a1a), LV_PART_MAIN);
         lv_obj_set_style_text_color(num, lv_color_hex(0xffffff), 0);
     }
 }
@@ -53,7 +51,7 @@ static void set_battery_connected(lv_obj_t *widget, struct connection_update_sta
 
     lv_obj_t *col = lv_obj_get_child(widget, state.source);
     lv_obj_t *num = lv_obj_get_child(col, 0);
-    lv_obj_t *bar = lv_obj_get_child(col, 1);
+    lv_obj_t *arc = lv_obj_get_child(col, 1);
     lv_obj_t *nc_label = lv_obj_get_child(col, 2);
 
     LOG_DBG("Peripheral %d %s", state.source,
@@ -62,10 +60,10 @@ static void set_battery_connected(lv_obj_t *widget, struct connection_update_sta
     if (state.connected) {
         lv_obj_fade_out(nc_label, 150, 0);
         lv_obj_fade_in(num, 150, 250);
-        lv_obj_fade_in(bar, 150, 250);
+        lv_obj_fade_in(arc, 150, 250);
     } else {
         lv_obj_fade_out(num, 150, 0);
-        lv_obj_fade_out(bar, 150, 0);
+        lv_obj_fade_out(arc, 150, 0);
         lv_obj_fade_in(nc_label, 150, 250);
     }
 }
@@ -126,43 +124,57 @@ int zmk_widget_battery_status_init(struct zmk_widget_battery_status *widget, lv_
 
     for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
         lv_obj_t *col = lv_obj_create(widget->obj);
-        lv_obj_set_size(col, 100, 80);
+        lv_obj_set_size(col, 120, 140);
         lv_obj_set_style_bg_opa(col, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(col, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_all(col, 0, LV_PART_MAIN);
 
-        /* Child 0: battery percentage */
+        /* Child 0: battery percentage (centered inside the arc) */
         lv_obj_t *num = lv_label_create(col);
         lv_obj_set_style_text_font(num, &FRAC_Medium_48, 0);
         lv_obj_set_style_text_color(num, lv_color_white(), 0);
         lv_label_set_text(num, "--");
-        lv_obj_align(num, LV_ALIGN_CENTER, 0, -8);
+        lv_obj_align(num, LV_ALIGN_CENTER, 0, -16);
         lv_obj_set_style_opa(num, 0, 0);
 
-        /* Child 1: thin progress bar */
-        lv_obj_t *bar = lv_bar_create(col);
-        lv_obj_set_size(bar, 88, 3);
-        lv_obj_align(bar, LV_ALIGN_CENTER, 0, 24);
-        lv_obj_set_style_bg_color(bar, lv_color_hex(0x1a1a1a), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(bar, 255, LV_PART_MAIN);
-        lv_obj_set_style_radius(bar, 1, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(bar, lv_color_hex(0x606060), LV_PART_INDICATOR);
-        lv_obj_set_style_bg_opa(bar, 255, LV_PART_INDICATOR);
-        lv_obj_set_style_bg_grad_color(bar, lv_color_hex(0xf0f0f0), LV_PART_INDICATOR);
-        lv_obj_set_style_bg_grad_dir(bar, LV_GRAD_DIR_HOR, LV_PART_INDICATOR);
-        lv_obj_set_style_bg_dither_mode(bar, LV_DITHER_ERR_DIFF, LV_PART_INDICATOR);
-        lv_obj_set_style_radius(bar, 1, LV_PART_INDICATOR);
-        lv_obj_set_style_anim_time(bar, 300, 0);
-        lv_bar_set_value(bar, 0, LV_ANIM_OFF);
-        lv_obj_set_style_opa(bar, 0, 0);
+        /* Child 1: circular ring gauge (Apple Watch style) */
+        lv_obj_t *arc = lv_arc_create(col);
+        lv_obj_set_size(arc, 108, 108);
+        lv_obj_align(arc, LV_ALIGN_CENTER, 0, -16);
+        lv_arc_set_range(arc, 0, 100);
+        lv_arc_set_bg_angles(arc, 135, 45);
+        lv_arc_set_rotation(arc, 0);
+        lv_arc_set_value(arc, 0);
+        lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
+        lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0x1a1a1a), LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(arc, 255, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(arc, 6, LV_PART_MAIN);
+        lv_obj_set_style_arc_rounded(arc, true, LV_PART_MAIN);
+
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0xf0f0f0), LV_PART_INDICATOR);
+        lv_obj_set_style_arc_opa(arc, 255, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_width(arc, 6, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_rounded(arc, true, LV_PART_INDICATOR);
+        lv_obj_set_style_anim_time(arc, 400, 0);
+        lv_obj_set_style_opa(arc, 0, 0);
 
         /* Child 2: disconnected indicator */
         lv_obj_t *nc_label = lv_label_create(col);
         lv_obj_set_style_text_font(nc_label, &FRAC_Thin_48, 0);
         lv_obj_set_style_text_color(nc_label, lv_color_hex(0x383838), 0);
         lv_label_set_text(nc_label, "--");
-        lv_obj_align(nc_label, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_align(nc_label, LV_ALIGN_CENTER, 0, -16);
         lv_obj_set_style_opa(nc_label, 255, 0);
+
+        /* Child 3: side identifier (always visible, sits below the ring) */
+        lv_obj_t *side = lv_label_create(col);
+        lv_obj_set_style_text_font(side, &SF_Compact_Text_Medium_24, 0);
+        lv_obj_set_style_text_color(side, lv_color_hex(0x606060), 0);
+        lv_obj_set_style_text_letter_space(side, 3, 0);
+        lv_label_set_text(side, i == 0 ? "LEFT" : "RIGHT");
+        lv_obj_align(side, LV_ALIGN_BOTTOM_MID, 0, -4);
     }
 
     sys_slist_append(&widgets, &widget->node);
